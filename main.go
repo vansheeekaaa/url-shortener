@@ -1,15 +1,15 @@
 package main
 
-import (
+import(
 	"github.com/gin-gonic/gin"
+	"urlshortener/handlers"
 )
 
 func main() {
-	router:=gin.Default();
-	router.GET("/ping", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"message":"pong",
-		})
-	})
-	router.Run();
+	router := gin.Default()
+
+	router.POST("/shorten", handlers.ShortenURL)
+	router.GET("/:shortcode", handlers.RedirectURL)
+
+	router.Run()
 }
