@@ -1,6 +1,7 @@
 package services
 
 import (
+	"net/url"
 	"math/rand"
 	"time"
 	"github.com/lib/pq"
@@ -20,6 +21,10 @@ func NewURLService(repo *repository.URLRepository) *URLService {
 }
 
 func (s *URLService) CreateShortURL(originalURL string) (string, error) {
+	parsedURL, err := url.ParseRequestURI(originalURL)
+    if err != nil || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
+        return "", errors.New("invalid URL")  
+    }
 	var shortCode string
 
 	for i:= 0; i<maxShortCodeGenRetries; i++ {

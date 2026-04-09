@@ -25,10 +25,14 @@ func (h *URLHandler) ShortenURL(c *gin.Context) {
 	}
 
 	shortCode, err := h.service.CreateShortURL(req.URL)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create short url"})
-		return
-	}
+    if err != nil {
+        if err.Error() == "invalid URL" {
+            c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        } else {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create short url"})
+        }
+        return
+    }
 
 	c.JSON(http.StatusOK, models.ShortenResponse{
 		ShortURL: shortCode,
