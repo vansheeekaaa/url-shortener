@@ -1,50 +1,48 @@
 package handlers
 
-import(
+import (
 	"net/http"
-	"github.com/gin-gonic/gin"
 
+	"github.com/gin-gonic/gin"
 	"urlshortener/models"
 	"urlshortener/services"
 )
 
-func ShortenURL(c *gin.Context) {
-	//mapping
-	request := models.ShortenRequest{}
-	err := c.BindJSON(&request)
+type URLHandler struct {
+	service *services.URLService
+}
 
-	if(err!=nil) {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error" : "invalid request",
-		})
-		return 
-	}
+func NewURLHandler(service *services.URLService) *URLHandler {
+	return &URLHandler{service: service}
+}
 
-	//validate
-	if(request.URL == "") {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error" : "no url found",
-		})
+func (h *URLHandler) ShortenURL(c *gin.Context) {
+	var req models.ShortenRequest
+
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return
 	}
 
-	shortCode := services.CreateShortURL(request.URL)
+	shortCode, err := h.service.CreateShortURL(req.URL)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create short url"})
+		return
+	}
 
 	c.JSON(http.StatusOK, models.ShortenResponse{
-		ShortURL : shortCode,
+		ShortURL: shortCode,
 	})
 }
 
-func RedirectURL(c *gin.Context) {
-	shortCode := c.Param("shortcode")
+func (h *URLHandler) Redirect(c *gin.Context) {
+	code := c.Param("code")
 
-	url, exists := services.GetOriginalURL(shortCode)
-
-	if(!exists) {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error" : "not found",
-		})
+	originalURL, err := h.service.GetOriginalURL(code)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "url not found"})
 		return
 	}
-	c.Redirect(http.StatusFound, url)
+
+	c.Redirect(http.StatusFound, originalURL)
 }

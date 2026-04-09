@@ -1,33 +1,43 @@
-package services 
+package services
 
 import (
 	"math/rand"
 	"time"
-	storage "urlshortener/storage"
+
+	"urlshortener/repository"
 )
 
-//generate shorturl from url
-func CreateShortURL(URL string) string {
-	shortCode := generateCode()
-	storage.URL[shortCode] = URL
-	return shortCode
+type URLService struct {
+	repo *repository.URLRepository
 }
 
-//generate random shortcode
+func NewURLService(repo *repository.URLRepository) *URLService {
+	return &URLService{repo: repo}
+}
+
+func (s *URLService) CreateShortURL(originalURL string) (string, error) {
+	shortCode := generateCode()
+
+	err := s.repo.Save(shortCode, originalURL)
+	if err != nil {
+		return "", err
+	}
+
+	return shortCode, nil
+}
+
 func generateCode() string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	rand.Seed(time.Now().UnixNano())
 
 	shortCode := make([]byte, 6)
-
-	for i:= range shortCode {
+	for i := range shortCode {
 		shortCode[i] = charset[rand.Intn(len(charset))]
 	}
 	return string(shortCode)
 }
 
-//fetch original url
-func GetOriginalURL(code string) (string, bool) {
-	url, exists:=storage.URL[code]
-	return url, exists
+func (s *URLService) GetOriginalURL(code string) (string, error) {
+	return s.repo.GetOriginalURL(code)
 }
+

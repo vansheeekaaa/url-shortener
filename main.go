@@ -1,18 +1,25 @@
 package main
 
-import(
-	"github.com/gin-gonic/gin"
-	"urlshortener/handlers"
+import (
 	"urlshortener/db"
+	"urlshortener/handlers"
+	"urlshortener/repository"
+	"urlshortener/services"
+	
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	router := gin.Default()
+	r := gin.Default()
 
-	router.POST("/shorten", handlers.ShortenURL)
-	router.GET("/:shortcode", handlers.RedirectURL)
-	database:=db.InitDB()
-	_ = database
+	database := db.InitDB()
 
-	router.Run()
+	urlRepo := repository.NewURLRepository(database)
+	urlService := services.NewURLService(urlRepo)
+	urlHandler := handlers.NewURLHandler(urlService)
+
+	r.POST("/shorten", urlHandler.ShortenURL)
+	r.GET("/:code", urlHandler.Redirect)
+
+	r.Run(":8080")
 }
