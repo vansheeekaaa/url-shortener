@@ -18,25 +18,25 @@ func NewURLHandler(service *services.URLService) *URLHandler {
 
 func (h *URLHandler) ShortenURL(c *gin.Context) {
 	var req models.ShortenRequest
-
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return
 	}
 
 	shortCode, err := h.service.CreateShortURL(req.URL)
-    if err != nil {
-        if err.Error() == "invalid URL" {
-            c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-        } else {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create short url"})
-        }
-        return
-    }
+	if err != nil {
+		switch err.Error() {
+		case "invalid URL":
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid URL, must include http:// or https://"})
+		case "could not generate unique short code after retries":
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not generate unique short code"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		}
+		return
+	}
 
-	c.JSON(http.StatusOK, models.ShortenResponse{
-		ShortURL: shortCode,
-	})
+	c.JSON(http.StatusOK, models.ShortenResponse{ShortURL: shortCode})
 }
 
 func (h *URLHandler) Redirect(c *gin.Context) {
