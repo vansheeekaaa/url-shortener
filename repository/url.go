@@ -1,6 +1,9 @@
 package repository
 
-import "database/sql"
+import (
+	"database/sql"
+	"time"
+)
 
 type URLRepository struct {
 	DB *sql.DB
@@ -10,23 +13,53 @@ func NewURLRepository(db *sql.DB) *URLRepository {
 	return &URLRepository{DB: db}
 }
 
-func (r *URLRepository) Save(shortCode string, originalURL string) error {
-	query := `INSERT INTO urls (short_code, original_url) VALUES ($1, $2)`
-
-	println("INSERTING INTO DB:", shortCode, originalURL)
-
-	_, err := r.DB.Exec(query, shortCode, originalURL)
+func (r *URLRepository) Save(shortCode, originalURL string, expiresAt *time.Time) error {
+	query := `INSERT INTO urls (short_code, original_url, expires_at) VALUES ($1, $2, $3)`
+	_, err := r.DB.Exec(query, shortCode, originalURL, expiresAt)
 	return err
 }
 
-func (r *URLRepository) GetOriginalURL(shortCode string) (string, error) {
-	query := `
-		SELECT original_url FROM urls
-		WHERE short_code = $1
-	`
+func (r *URLRepository) GetByOriginalURL(originalURL string) (string, *time.Time, error) {
+	var code string
+	var expiresAt sql.NullTime
 
+	query := `SELECT short_code, expires_at FROM urls WHERE original_url = $1`
+	err := r.DB.QueryRow(query, originalURL).Scan(&code, &expiresAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", nil, sql.ErrNoRows
+		}
+		return "", nil, err
+	}
+
+	var expiryPtr *time.Time
+	if expiresAt.Valid {
+		expiryPtr = &expiresAt.Time
+	}
+
+	return code, expiryPtr, nil
+}
+
+func (r *URLRepository) UpdateExpiry(shortCode string, expiresAt *time.Time) error {
+	query := `UPDATE urls SET expires_at = $1 WHERE short_code = $2`
+	_, err := r.DB.Exec(query, expiresAt, shortCode)
+	return err
+}
+
+func (r *URLRepository) GetByShortCode(code string) (string, *time.Time, error) {
 	var originalURL string
-	err := r.DB.QueryRow(query, shortCode).Scan(&originalURL)
+	var expiresAt sql.NullTime
 
-	return originalURL, err
+	query := `SELECT original_url, expires_at FROM urls WHERE short_code = $1`
+	err := r.DB.QueryRow(query, code).Scan(&originalURL, &expiresAt)
+	if err != nil {
+		return "", nil, err
+	}
+
+	var expiryPtr *time.Time
+	if expiresAt.Valid {
+		expiryPtr = &expiresAt.Time
+	}
+
+	return originalURL, expiryPtr, nil
 }
