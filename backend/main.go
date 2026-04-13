@@ -37,5 +37,10 @@ func main() {
 	r.POST("/shorten", urlHandler.ShortenURL)
 	r.GET("/:code", urlHandler.Redirect)
 
+	//health check endpoint for UptimeRobot
+	r.GET("/ping", func(c *gin.Context) {
+		c.JSON(200, gin.H{"message": "pong", "status": "alive"})
+	})
+
 	r.Run(":8080")
 }
