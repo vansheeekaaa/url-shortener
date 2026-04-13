@@ -35,12 +35,14 @@ func main() {
 	urlHandler := handlers.NewURLHandler(urlService)
 
 	r.POST("/shorten", urlHandler.ShortenURL)
-	r.GET("/:code", urlHandler.Redirect)
 
-	//health check endpoint for UptimeRobot
+	// /stats/:code and /ping must be registered before /:code so Gin's
+	// radix tree prefers specific static prefixes over the wildcard param.
+	r.GET("/stats/:code", urlHandler.GetStats)
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "pong", "status": "alive"})
 	})
+	r.GET("/:code", urlHandler.Redirect)
 
 	r.Run(":8080")
 }

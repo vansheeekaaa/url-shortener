@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"urlshortener/models"
+
 	"github.com/lib/pq"
 )
 
@@ -25,6 +27,8 @@ type URLRepo interface {
 	Save(string, string, *time.Time) error
 	GetByOriginalURL(string) (string, *time.Time, error)
 	GetByShortCode(string) (string, *time.Time, error)
+	RecordClick(string) error
+	GetStats(string) (*models.URLStats, error)
 }
 
 type URLService struct {
@@ -74,7 +78,7 @@ func (s *URLService) CreateShortURL(originalURL string, expirySeconds int64) (st
 			return existingCode, nil
 		}
 	}
-	
+
 	//new short code
 	for i := 0; i < maxShortCodeGenRetries; i++ {
 		code := generateCode()
@@ -109,7 +113,21 @@ func (s *URLService) GetOriginalURL(code string) (string, error) {
 		return "", ErrExpired
 	}
 
+	// Fire-and-forget: record the click without blocking the redirect response.
+	go s.repo.RecordClick(code)
+
 	return originalURL, nil
+}
+
+func (s *URLService) GetStats(code string) (*models.URLStats, error) {
+	stats, err := s.repo.GetStats(code)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return stats, nil
 }
 
 func normalizeURL(raw string) (string, error) {

@@ -4,27 +4,34 @@ import (
 	"database/sql"
 	"testing"
 	"time"
+
+	"urlshortener/models"
 )
+
+// ---- mock repo ----
 
 type mockRepo struct {
 	store map[string]struct {
-		url       string
-		expiresAt *time.Time
+		url        string
+		expiresAt  *time.Time
+		clickCount int
 	}
 }
 
 func newMockRepo() *mockRepo {
 	return &mockRepo{store: make(map[string]struct {
-		url       string
-		expiresAt *time.Time
+		url        string
+		expiresAt  *time.Time
+		clickCount int
 	})}
 }
 
 func (m *mockRepo) Save(code, url string, expiry *time.Time) error {
 	m.store[code] = struct {
-		url       string
-		expiresAt *time.Time
-	}{url, expiry}
+		url        string
+		expiresAt  *time.Time
+		clickCount int
+	}{url, expiry, 0}
 	return nil
 }
 
@@ -37,13 +44,6 @@ func (m *mockRepo) GetByOriginalURL(url string) (string, *time.Time, error) {
 	return "", nil, sql.ErrNoRows
 }
 
-func (m *mockRepo) UpdateExpiry(code string, expiry *time.Time) error {
-	v := m.store[code]
-	v.expiresAt = expiry
-	m.store[code] = v
-	return nil
-}
-
 func (m *mockRepo) GetByShortCode(code string) (string, *time.Time, error) {
 	v, ok := m.store[code]
 	if !ok {
@@ -51,6 +51,30 @@ func (m *mockRepo) GetByShortCode(code string) (string, *time.Time, error) {
 	}
 	return v.url, v.expiresAt, nil
 }
+
+func (m *mockRepo) RecordClick(code string) error {
+	if v, ok := m.store[code]; ok {
+		v.clickCount++
+		m.store[code] = v
+	}
+	return nil
+}
+
+func (m *mockRepo) GetStats(code string) (*models.URLStats, error) {
+	v, ok := m.store[code]
+	if !ok {
+		return nil, sql.ErrNoRows
+	}
+	return &models.URLStats{
+		ShortCode:   code,
+		OriginalURL: v.url,
+		ClickCount:  v.clickCount,
+		CreatedAt:   time.Now(),
+		ExpiresAt:   v.expiresAt,
+	}, nil
+}
+
+// ---- existing tests (unchanged) ----
 
 func TestNormalization_Idempotency(t *testing.T) {
 	repo := newMockRepo()
@@ -151,5 +175,45 @@ func TestGetOriginalURL_NotFound(t *testing.T) {
 	_, err := service.GetOriginalURL("abcd")
 	if err != ErrNotFound {
 		t.Fatalf("expected not found error")
+	}
+}
+
+// ---- new analytics tests ----
+
+func TestGetStats_ClickCount(t *testing.T) {
+	repo := newMockRepo()
+	service := NewURLService(repo)
+
+	code, err := service.CreateShortURL("https://example.com", 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Simulate 3 redirects. RecordClick runs in a goroutine inside
+	// GetOriginalURL, so we yield briefly after each call.
+	for i := 0; i < 3; i++ {
+		if _, err := service.GetOriginalURL(code); err != nil {
+			t.Fatalf("unexpected redirect error on call %d: %v", i+1, err)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	stats, err := service.GetStats(code)
+	if err != nil {
+		t.Fatalf("unexpected stats error: %v", err)
+	}
+
+	if stats.ClickCount != 3 {
+		t.Fatalf("expected 3 clicks, got %d", stats.ClickCount)
+	}
+}
+
+func TestGetStats_NotFound(t *testing.T) {
+	repo := newMockRepo()
+	service := NewURLService(repo)
+
+	_, err := service.GetStats("doesnotexist")
+	if err != ErrNotFound {
+		t.Fatalf("expected not found error, got %v", err)
 	}
 }

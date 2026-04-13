@@ -58,7 +58,8 @@ func (h *URLHandler) ShortenURL(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, models.ShortenResponse{
-		ShortURL: h.baseURL + "/" + shortCode,
+		ShortURL:  h.baseURL + "/" + shortCode,
+		ShortCode: shortCode,
 	})
 }
 
@@ -82,4 +83,23 @@ func (h *URLHandler) Redirect(c *gin.Context) {
 	}
 
 	c.Redirect(http.StatusTemporaryRedirect, originalURL)
+}
+
+// GET /stats/:code
+func (h *URLHandler) GetStats(c *gin.Context) {
+	code := c.Param("code")
+
+	stats, err := h.service.GetStats(code)
+	if err != nil {
+		switch {
+		case errors.Is(err, services.ErrNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "url not found"})
+
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, stats)
 }

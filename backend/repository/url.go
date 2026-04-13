@@ -3,6 +3,8 @@ package repository
 import (
 	"database/sql"
 	"time"
+
+	"urlshortener/models"
 )
 
 type URLRepository struct {
@@ -63,4 +65,44 @@ func (r *URLRepository) GetByShortCode(code string) (string, *time.Time, error) 
 	}
 
 	return originalURL, expiryPtr, nil
+}
+
+// RecordClick atomically increments the click counter and sets last_accessed_at.
+func (r *URLRepository) RecordClick(code string) error {
+	query := `UPDATE urls SET click_count = click_count + 1, last_accessed_at = NOW() WHERE short_code = $1`
+	_, err := r.DB.Exec(query, code)
+	return err
+}
+
+// GetStats returns the full analytics record for a short code.
+func (r *URLRepository) GetStats(code string) (*models.URLStats, error) {
+	var stats models.URLStats
+	var expiresAt sql.NullTime
+	var lastAccessedAt sql.NullTime
+
+	query := `
+		SELECT short_code, original_url, click_count, created_at, last_accessed_at, expires_at
+		FROM urls
+		WHERE short_code = $1
+	`
+	err := r.DB.QueryRow(query, code).Scan(
+		&stats.ShortCode,
+		&stats.OriginalURL,
+		&stats.ClickCount,
+		&stats.CreatedAt,
+		&lastAccessedAt,
+		&expiresAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if lastAccessedAt.Valid {
+		stats.LastAccessedAt = &lastAccessedAt.Time
+	}
+	if expiresAt.Valid {
+		stats.ExpiresAt = &expiresAt.Time
+	}
+
+	return &stats, nil
 }
