@@ -1,4 +1,4 @@
-const API_URL = "https://url-shortener-api-gzty.onrender.com";
+const API_URL = "https://snip-url-api.onrender.com";
 
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('shorten-form');
