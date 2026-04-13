@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Snip</title>
+
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+  <!-- NAV -->
+  <nav class="nav">
+    <div class="logo">SnipURL</div>
+    <div class="nav-right">
+      <a href="https://github.com/vansheeekaaa/url-shortener" target="_blank">docs</a>
+      <a class="btn" href="https://github.com/vansheeekaaa/url-shortener" target="_blank">github</a>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <main class="hero">
+    <h1> Shorten Your <span>Long Links</span> </h1>
+    <p>Fast URL shortener with expiry support</p>
+
+    <form id="shorten-form">
+      <div class="input-bar">
+        <input id="url-input" type="url" placeholder="Paste your long URL here..." required />
+        <button type="submit" id="submit-btn" aria-label="Shorten URL">Snip</button>
+      </div>
+
+      <div class="advanced-settings-wrapper">
+         <label for="expiry-input">Optional: Expiry</label>
+         <select id="expiry-input" class="modern-select">
+            <option value="0">Never</option>
+            <option value="3600">1 Hour</option>
+            <option value="86400">1 Day</option>
+            <option value="604800">1 Week</option>
+            <option value="2592000">30 Days</option>
+         </select>
+      </div>
+    </form>
+
+    <div id="result-container" class="hidden">
+      <div class="result-box">
+        <a id="short-url-link" href="#" target="_blank" rel="noopener noreferrer"></a>
+        <button id="copy-btn" class="copy-btn">Copy</button>
+      </div>
+    </div>
+
+    <div id="error-message" class="hidden error-box"></div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
