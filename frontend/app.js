@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:8080';
+const API_URL = "https://url-shortener-api-gzty.onrender.com";
 
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('shorten-form');
