@@ -6,7 +6,7 @@ import (
 	"urlshortener/handlers"
 	"urlshortener/repository"
 	"urlshortener/services"
-	
+
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
@@ -14,11 +14,12 @@ import (
 func main() {
 	r := gin.Default()
 
-	err := godotenv.Load()
+	_ = godotenv.Load()
+
+	database, err := db.InitDB()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		log.Fatal(err)
 	}
-	database := db.InitDB()
 
 	urlRepo := repository.NewURLRepository(database)
 	urlService := services.NewURLService(urlRepo)

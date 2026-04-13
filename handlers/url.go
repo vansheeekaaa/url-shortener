@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"errors"
-	"log"
 	"net/http"
+	"os"
 
 	"urlshortener/models"
 	"urlshortener/services"
@@ -13,24 +13,37 @@ import (
 
 type URLHandler struct {
 	service *services.URLService
+	baseURL string
 }
 
 func NewURLHandler(service *services.URLService) *URLHandler {
-	return &URLHandler{service: service}
+	baseURL := os.Getenv("BASE_URL")
+	if baseURL == "" {
+		baseURL = "http://localhost:8080"
+	}
+
+	return &URLHandler{
+		service: service,
+		baseURL: baseURL,
+	}
 }
 
+// POST /shorten
 func (h *URLHandler) ShortenURL(c *gin.Context) {
 	var req models.ShortenRequest
 
-	if err := c.BindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	if req.URL == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "url is required"})
 		return
 	}
 
 	shortCode, err := h.service.CreateShortURL(req.URL, req.ExpirySeconds)
 	if err != nil {
-		log.Println("Service error:", err)
-
 		switch {
 		case errors.Is(err, services.ErrInvalidURL):
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid URL"})
@@ -45,10 +58,11 @@ func (h *URLHandler) ShortenURL(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, models.ShortenResponse{
-		ShortURL: shortCode,
+		ShortURL: h.baseURL + "/" + shortCode,
 	})
 }
 
+// GET /:code
 func (h *URLHandler) Redirect(c *gin.Context) {
 	code := c.Param("code")
 
@@ -67,5 +81,5 @@ func (h *URLHandler) Redirect(c *gin.Context) {
 		return
 	}
 
-	c.Redirect(http.StatusFound, originalURL)
+	c.Redirect(http.StatusTemporaryRedirect, originalURL)
 }

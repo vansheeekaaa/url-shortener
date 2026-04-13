@@ -23,7 +23,14 @@ func (r *URLRepository) GetByOriginalURL(originalURL string) (string, *time.Time
 	var code string
 	var expiresAt sql.NullTime
 
-	query := `SELECT short_code, expires_at FROM urls WHERE original_url = $1`
+	query := `
+		SELECT short_code, expires_at
+		FROM urls
+		WHERE original_url = $1
+		ORDER BY created_at DESC
+		LIMIT 1
+		`
+
 	err := r.DB.QueryRow(query, originalURL).Scan(&code, &expiresAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -38,12 +45,6 @@ func (r *URLRepository) GetByOriginalURL(originalURL string) (string, *time.Time
 	}
 
 	return code, expiryPtr, nil
-}
-
-func (r *URLRepository) UpdateExpiry(shortCode string, expiresAt *time.Time) error {
-	query := `UPDATE urls SET expires_at = $1 WHERE short_code = $2`
-	_, err := r.DB.Exec(query, expiresAt, shortCode)
-	return err
 }
 
 func (r *URLRepository) GetByShortCode(code string) (string, *time.Time, error) {

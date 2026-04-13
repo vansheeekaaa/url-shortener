@@ -1,9 +1,10 @@
 package services
 
 import (
+	"crypto/rand"
 	"database/sql"
 	"errors"
-	"math/rand"
+	"math/big"
 	"net/url"
 	"strings"
 	"time"
@@ -23,7 +24,6 @@ var (
 type URLRepo interface {
 	Save(string, string, *time.Time) error
 	GetByOriginalURL(string) (string, *time.Time, error)
-	UpdateExpiry(string, *time.Time) error
 	GetByShortCode(string) (string, *time.Time, error)
 }
 
@@ -36,16 +36,19 @@ func NewURLService(repo URLRepo) *URLService {
 }
 
 func (s *URLService) CreateShortURL(originalURL string, expirySeconds int64) (string, error) {
+	//validate url
 	parsed, err := url.ParseRequestURI(originalURL)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		return "", ErrInvalidURL
 	}
 
+	//normalize url
 	normalizedURL, err := normalizeURL(originalURL)
 	if err != nil {
 		return "", ErrInvalidURL
 	}
 
+	//validate expiry
 	if expirySeconds < 0 {
 		return "", ErrExpiryInvalid
 	}
@@ -58,28 +61,29 @@ func (s *URLService) CreateShortURL(originalURL string, expirySeconds int64) (st
 		newExpiry = &t
 	}
 
+	//check if active url already exists
 	existingCode, existingExpiry, err := s.repo.GetByOriginalURL(normalizedURL)
 	if err != nil && err != sql.ErrNoRows {
 		return "", err
 	}
 
-	if err != sql.ErrNoRows && existingCode != "" {
+	if err == nil && existingCode != "" {
 		if existingExpiry != nil && existingExpiry.Before(now) {
-			existingCode = ""
+			// expired → ignore, create new
 		} else {
-			if err := s.repo.UpdateExpiry(existingCode, newExpiry); err != nil {
-				return "", err
-			}
 			return existingCode, nil
 		}
 	}
-
+	
+	//new short code
 	for i := 0; i < maxShortCodeGenRetries; i++ {
 		code := generateCode()
+
 		err := s.repo.Save(code, normalizedURL, newExpiry)
 		if err == nil {
 			return code, nil
 		}
+
 		if isUniqueViolation(err) {
 			continue
 		}
@@ -117,17 +121,27 @@ func normalizeURL(raw string) (string, error) {
 	if u.Path == "" {
 		u.Path = "/"
 	}
-	return u.Scheme + "://" + u.Host + u.Path + "?" + u.RawQuery, nil
-}
 
-var seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
+	result := u.Scheme + "://" + u.Host + u.Path
+	if u.RawQuery != "" {
+		result += "?" + u.RawQuery
+	}
+
+	return result, nil
+}
 
 func generateCode() string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	b := make([]byte, 6)
+
 	for i := range b {
-		b[i] = charset[seededRand.Intn(len(charset))]
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			continue
+		}
+		b[i] = charset[n.Int64()]
 	}
+
 	return string(b)
 }
 
