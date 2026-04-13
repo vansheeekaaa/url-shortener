@@ -134,12 +134,13 @@ func generateCode() string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	b := make([]byte, 6)
 
-	for i := range b {
+	for i := 0; i < len(b); {
 		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
 		if err != nil {
 			continue
 		}
 		b[i] = charset[n.Int64()]
+		i++
 	}
 
 	return string(b)
